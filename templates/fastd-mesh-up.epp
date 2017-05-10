@@ -1,0 +1,16 @@
+<% | String $ifname, String $meshvpnmac, String $meshserver | -%>
+#!/bin/bash
+# BEWARE: Helper script managed by Puppet; pulls up the mesh interface
+# and adds it to the corresponding bridge.
+
+# Enable batman-adv for the interface.
+ip link set dev <%= $ifname %>vpn addr <%= $meshvpnmac %> up
+batctl -m <%= $ifname %>bat if add <%= $ifname %>vpn
+batctl -m <%= $ifname %>bat gw_mode server <%= $meshserver %>
+batctl -m <%= $ifname %>bat bl 1
+batctl -m <%= $ifname %>bat mm 1
+batctl -m <%= $ifname %>bat it 5000
+
+# Attach the corresponding batman interface to the bridge.
+ip link set <%= $ifname %>bat up
+brctl addif <%= $ifname %> <%= $ifname %>bat

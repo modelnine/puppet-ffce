@@ -1,0 +1,19 @@
+{
+  "name": "ffce-ffce",
+  "version": "0.1.0",
+  "author": "ffce",
+  "summary": "Freifunk Celle system configuration with Puppet. Uses Debian systems to configure the hosts.",
+  "license": "Apache-2.0",
+  "source": "",
+  "project_page": null,
+  "issues_url": null,
+  "dependencies": [
+    {"name":"puppetlabs-stdlib","version_requirement":">= 1.0.0"},
+    {"name":"puppetlabs-apt","version_requirement":">= 4.0.0"},
+    {"name":"puppetlabs-ntp","version_requirement":">= 6.2.0"},
+    {"name":"camptocamp-postfix","version_requirement":">= 1.5.0"},
+    {"name":"example42-network","version_requirement":">= 3.3.6"}
+  ],
+  "data_provider": null
+}
+

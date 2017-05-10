@@ -1,0 +1,35 @@
+<% | Integer $port, String $ifname, Array[String] $methods, Integer $mtu, String $title, String $upscript, String $downscript | -%>
+# BEWARE: file is managed by puppet (module ffce). Do not update settings below,
+# they will be overwritten when the module runs again.
+
+# Logging for the tunnel.
+log level error;
+log to syslog level info;
+
+# Set the interface name for the tunnel.
+interface "<%= $ifname %>";
+
+# Set up all methods for communication to be supported on fastd.
+<% $methods.each |$method| { -%>
+method "<%= $method %>";
+<% } -%>
+
+# Bind to a specific port,
+bind any:<%= $port %>;
+
+# Set up interface MTU based on
+mtu <%= $mtu %>;
+
+# Up and down scripts.
+<% if $upscript != nil { -%>
+on up "/etc/fastd/<%= $title %>/fastd-up";
+<% } -%>
+<% if $downscript != nil { -%>
+on down "/etc/fastd/<%= $title %>/fastd-down";
+<% } -%>
+
+# Include peers from the directory 'peers' and load secret key.
+# Filling peers into the peers directory is left up to someone using
+# the module.
+include "fastd.secret.conf";
+include peers from "peers";

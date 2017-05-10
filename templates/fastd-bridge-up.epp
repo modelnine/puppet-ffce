@@ -1,0 +1,8 @@
+<% | String $ifname | -%>
+#!/bin/bash
+# BEWARE: Helper script managed by Puppet; pulls up the mesh interface
+# and adds it to the corresponding bridge.
+
+# Attach the corresponding plain interface to the bridge.
+ip link set <%= $ifname %>vpn up
+brctl addif <%= $ifname %> <%= $ifname %>vpn
