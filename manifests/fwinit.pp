@@ -56,26 +56,20 @@ class ffce::fwinit (
     proto => all,
     iniface => lo,
     action => accept,
-  } ->
+  }
   firewall { '001 accept all v4 icmp':
     proto => icmp,
     action => accept,
-  } ->
-  firewall { '002 accept v4 related established rules':
+  }
+  firewall { '010 accept v4 related established rules':
     proto => all,
     state => ['RELATED', 'ESTABLISHED'],
     action => accept,
-  } ->
-  firewall { '003 accept ssh on all v4 interfaces':
+  }
+  firewall { '011 accept ssh on all v4 interfaces':
     proto => tcp,
     dport => 22,
     state => ['NEW'],
-    action => accept,
-  } ->
-  firewall { '004 accept established related v4':
-    chain => 'FORWARD',
-    proto => all,
-    state => ['RELATED', 'ESTABLISHED'],
     action => accept,
   }
 
@@ -97,29 +91,22 @@ class ffce::fwinit (
     iniface => lo,
     action => accept,
     provider => ip6tables,
-  } ->
+  }
   firewall { '001 accept all v6 icmp':
     proto => 'ipv6-icmp',
     action => accept,
     provider => ip6tables,
-  } ->
-  firewall { '002 accept v6 related established rules':
+  }
+  firewall { '010 accept v6 related established rules':
     proto => all,
     state => ['RELATED', 'ESTABLISHED'],
     action => accept,
     provider => ip6tables,
-  } ->
-  firewall { '003 accept ssh on all v6 interfaces':
+  }
+  firewall { '011 accept ssh on all v6 interfaces':
     proto => tcp,
     dport => 22,
     state => ['NEW'],
-    action => accept,
-    provider => ip6tables,
-  } ->
-  firewall { '004 accept established related v6':
-    chain => 'FORWARD',
-    proto => all,
-    state => ['RELATED', 'ESTABLISHED'],
     action => accept,
     provider => ip6tables,
   }

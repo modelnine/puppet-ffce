@@ -70,17 +70,32 @@ class ffce::freifunk (
     vpnport => $meshvpnport,
     meshserver => $meshserver,
     meshvpnmac => $meshvpnmac,
-  } ->
+  }
   firewall { '110 mesh vpn in v4':
     proto => udp,
     dport => $meshvpnport,
     state => ['NEW'],
     action => accept,
-  } ->
+  }
   firewall { '110 mesh vpn in v6':
     proto => udp,
     dport => $meshvpnport,
     state => ['NEW'],
+    action => accept,
+    provider => ip6tables,
+  }
+  firewall { '100 allow mesh to mesh v4':
+    chain => 'FORWARD',
+    proto => all,
+    source => "${ffnet}/${ffmask}",
+    destination => "${ffnet}/${ffmask}",
+    action => accept,
+  }
+  firewall { '100 allow mesh to mesh v6':
+    chain => 'FORWARD',
+    proto => all,
+    source => "${ff6net}/${ff6mask}",
+    destination => "${ff6net}/${ff6mask}",
     action => accept,
     provider => ip6tables,
   }
@@ -97,13 +112,13 @@ class ffce::freifunk (
     net6mask => '64',
     vpnport => 9999,
     localif => $mgmtlocalif,
-  } ->
+  }
   firewall { '110 mgmt vpn in v4':
     proto => udp,
     dport => 9999,
     state => ['NEW'],
     action => accept,
-  } ->
+  }
   firewall { '110 mgmt vpn in v6':
     proto => udp,
     dport => 9999,
@@ -158,6 +173,38 @@ class ffce::freifunk (
     network::routing_table { "mullvad${ifidx}":
       table_id => "${ifidx}",
     }
+
+    # Attach firewall rule for outgoing mullvad traffic from Freifunk network.
+    firewall { "200 mullvad${ifidx} out v4":
+      chain => 'FORWARD',
+      proto => all,
+      source => "${ffnet}/${ffmask}",
+      outiface => "mullvad${ifidx}",
+      action => accept,
+    }
+    firewall { "200 mullvad${ifidx} in v4":
+      chain => 'FORWARD',
+      proto => all,
+      destination => "${ffnet}/${ffmask}",
+      iniface => "mullvad${ifidx}",
+      action => accept,
+    }
+    firewall { "200 mullvad${ifidx} out v6":
+      chain => 'FORWARD',
+      proto => all,
+      source => "${ff6net}/${ff6mask}",
+      outiface => "mullvad${ifidx}",
+      action => accept,
+      provider => ip6tables,
+    }
+    firewall { "200 mullvad${ifidx} in v6":
+      chain => 'FORWARD',
+      proto => all,
+      destination => "${ff6net}/${ff6mask}",
+      iniface => "mullvad${ifidx}",
+      action => accept,
+      provider => ip6tables,
+    }
   }
 
   # Set up routing for marks.
@@ -178,6 +225,34 @@ class ffce::freifunk (
       "from fd92:2dff:d232:3fc0::/64 table main pref 10",
       "from ${ff6net}/${ff6mask} table freifunk pref 100",
     ],
+  }
+
+  # Set up rules to decide for outgoing packets where they
+  # should be destined for freifunk network.
+  firewall { '001 mullvad decide outgoing interface v4':
+    table => mangle,
+    chain => 'PREROUTING',
+    source => "${ffnet}/${ffmask}",
+    destination => "! ${ffnet}/${ffmask}",
+    proto => all,
+    jump => 'HMARK',
+    hmark_src_prefix => 32,
+    hmark_rnd => '0xffceffce',
+    hmark_offset => 1,
+    hmark_mod => length($mullvad),
+  }
+  firewall { '001 mullvad decide outgoing interface v6':
+    table => mangle,
+    chain => 'PREROUTING',
+    source => "${ff6net}/${ff6mask}",
+    destination => "! ${ff6net}/${ff6mask}",
+    proto => all,
+    jump => 'HMARK',
+    hmark_src_prefix => 128,
+    hmark_rnd => '0xffceffce',
+    hmark_offset => 1,
+    hmark_mod => length($mullvad),
+    provider => ip6tables,
   }
 
   # Enable routing daemons for routing in the management network.
@@ -205,5 +280,31 @@ class ffce::freifunk (
       ff6net => $ff6net,
       ff6mask => $ff6mask,
     }),
+  }
+  firewall { '002 mgmt ospf in v4':
+    proto => ospf,
+    iniface => mgmt,
+    action => accept,
+  }
+  firewall { '002 mgmt ospf in v6':
+    proto => ospf,
+    iniface => mgmt,
+    action => accept,
+    provider => ip6tables,
+  }
+  firewall { '101 mgmt outgoing routes from ospf v4':
+    chain => 'FORWARD',
+    proto => all,
+    source => "${ffnet}/${ffmask}",
+    outiface => mgmt,
+    action => accept,
+  }
+  firewall { '101 mgmt outgoing routes from ospf v6':
+    chain => 'FORWARD',
+    proto => all,
+    source => "${ff6net}/${ff6mask}",
+    outiface => mgmt,
+    action => accept,
+    provider => ip6tables,
   }
 }
