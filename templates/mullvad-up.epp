@@ -1,0 +1,28 @@
+<% | String $ifip, String $ifip6 | -%>
+#!/bin/bash
+# Mullvad up script which sets up IP configuration and default route through the
+# tunnel interface for the Freifunk network. This configures the routes and SNATs
+# for a single Mullvad interface; when multiple are pulled up, they get a new
+# table and an additional firewall mark to send packets out.
+
+# Enable NAT for tunnel interface.
+iptables -t nat -F ${dev}
+iptables -t nat -A ${dev} -j SNAT --to-source ${ifconfig_local}
+
+# Enable IPv6 NAT for tunnel interface.
+ip6tables -t nat -F ${dev}
+ip6tables -t nat -A ${dev} -j SNAT --to-source ${ifconfig_ipv6_local}
+
+# Enable interface IP addresses.
+<% if $ifip { -%>
+ip addr add <%= $ifip %>/32 dev ${dev}
+<% } -%>
+<% if $ifip6 { -%>
+ip -6 addr add <%= $ifip6 %>/128 dev ${dev}
+<% } -%>
+
+# Finally, remove reverse path filter on interface.
+echo 0 > /proc/sys/net/ipv4/conf/${dev}/rp_filter
+
+# Up the actual interface now that it's finalized.
+ip link set ${dev} up

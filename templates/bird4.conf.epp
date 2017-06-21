@@ -1,0 +1,151 @@
+<% | String $routerid, Array[Integer] $ipmarks, Integer $basetable, String $ffnet, String $ffmask | -%>
+# Configuration for OSPF learning of additional known routes through
+# the freifunk management interface. The actual OSPF packets are
+# directed over the freifunk link (specific neighbors), and are not
+# broadcast. The packets themselves are transported in an ESP tunnel
+# over the specified link.
+
+# Log to syslog.
+log syslog {
+	info, remote, warning, error, auth, fatal, bug
+};
+
+# Router ID to use; juse use the primary IP on the management interface.
+router id <%= $routerid %>;
+
+# Additional tables that are set up for the network.
+table freifunk;
+<% $ipmarks.each | $ifidx | { -%>
+table mullvad<%= $ifidx %>;
+<% } -%>
+table main;
+
+# This pseudo-protocol watches all interface up/down events.
+protocol device {
+	scan time 10;
+	primary 10.0.0.0/8;
+}
+
+# Routing table for the local routes from this host. Only exports the
+# freifunk network routes.
+protocol kernel {
+	table main;
+	preference 10;
+	learn;
+	scan time 20;
+	import all;
+	export filter {
+		if dest != RTD_BLACKHOLE then krt_metric = 100; else krt_metric = 10000;
+		accept;
+	};
+	kernel table 254;
+}
+
+# Piping protocol which handles updating changes between routing tables.
+# Don't export any routes from the local main routing table (which
+# contains routes that aren't Freifunk-available directly), and import
+# only those routes that are contained in the Freifunk networks.
+protocol pipe {
+	table main;
+	peer table freifunk;
+	import filter {
+		if net ~ 10.0.0.0/8 then accept;
+		reject;
+	};
+	export none;
+}
+
+# Base routing table is the Freifunk routing table which is the
+# default table that's used for all network interface traffic routes.
+protocol kernel {
+	table freifunk;
+	preference 8;
+	learn;
+	scan time 20;
+	device routes;
+	import all;
+	export filter {
+		if dest != RTD_BLACKHOLE then krt_metric = 100; else krt_metric = 10000;
+		accept;
+	};
+	kernel table <%= $basetable %>;
+}
+
+# Additional static routes which are always set up independent of the
+# actual interface routes that are available. By default, the whole of
+# Freifunk is unreachable and there is no default route.
+protocol static {
+	table freifunk;
+	preference 1;
+	route 10.0.0.0/8 blackhole;
+	route 0.0.0.0/0 blackhole;
+}
+
+# Networks which are directly attached to the freifunk table, this manages
+# all routes in the mesh table. The mesh network is not part of the OSPF
+# domain, so bind it directly.
+protocol direct {
+	table freifunk;
+	interface "mesh";
+}
+
+<% $ipmarks.each | $ifidx | { -%>
+# Mullvad routing table for the default routes with the fwmarked packets.
+# This just manages a default gateway.
+protocol kernel {
+	table mullvad<%= $ifidx %>;
+	preference 9;
+	learn;
+	scan time 20;
+	device routes;
+	import all;
+	export filter {
+		if dest != RTD_BLACKHOLE then krt_metric = 100; else krt_metric = 10000;
+		accept;
+	};
+	kernel table <%= $ifidx %>;
+}
+
+# Enable static default route in the mullvad table when the corresponding
+# interface is up.
+protocol static {
+	table mullvad<%= $ifidx %>;
+	preference 9;
+	route 0.0.0.0/0 via "mullvad<%= $ifidx %>";
+}
+
+# Import default route from mullvad table to freifunk table. This manages
+# the import of the corresponding mullvad routes to freifunk when the
+# corresponding default route interface is up.
+protocol pipe {
+	table mullvad<%= $ifidx %>;
+	peer table freifunk;
+	import none;
+	export all;
+}
+
+<% } -%>
+# OSPF area for synchronization of routes between different gateways.
+# This allows for transport of the different networks between the hosts
+# connected to the management network and also pushes the default routes
+# out to other hosts.
+protocol ospf freifunknet {
+	# Main Freifunk area.
+	table freifunk;
+	instance id 0;
+	preference 7;
+	import all;
+	export filter {
+		if dest = RTD_BLACKHOLE then reject;
+		if net = 0.0.0.0/0 then ospf_metric1 = 1000;
+		else if !( net ~ <%= $ffnet %>/<%= $ffmask %> ) then ospf_metric1 = 3000;
+		accept;
+	};
+
+	# Default area for the internal addresses. This pushes the local
+	# freifunk networks via the management interface.
+	area 0 {
+		interface "mgmt" {
+		};
+	};
+}

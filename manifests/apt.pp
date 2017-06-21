@@ -241,9 +241,20 @@ class ffce::apt (
     'mtr': ensure => latest;
     'tcpdump': ensure => latest;
     'emacs': ensure => latest;
+    'sudo': ensure => latest;
+    'logwatch': ensure => latest;
     'bridge-utils': ensure => installed;
     'vlan': ensure => installed;
     'ifenslave': ensure => installed;
     'git': ensure => installed;
+    'screen': ensure => installed;
+  }
+
+  # Remove unnecessary default packages for Debian installations;
+  # we offer no UNIX-RPC services, and rdnssd is only required for
+  # dynamic uplinks, which there are none.
+  package {
+    'rndssd': ensure => purged;
+    'rpcbind': ensure => purged;
   }
 }
